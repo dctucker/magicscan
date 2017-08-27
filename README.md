@@ -6,7 +6,7 @@ Scan and recognize Magic the Gathering cards
 You'll need Python 2.7, OpenCV, and Tesseract.
 On Mac OS it's helpful to use a virtual environment to avoid package collisions:
 
-virtualenv .
+virtualenv env
 source bin/activate
 
 Run pip install dependent packages:
