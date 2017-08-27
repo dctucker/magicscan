@@ -7,9 +7,6 @@ import json
 from difflib import SequenceMatcher
 from operator import itemgetter
 
-def similar(a, b):
-    return SequenceMatcher(None, a, b).ratio()
-
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True,
 	help="path to input image to be OCR'd")
@@ -18,9 +15,6 @@ ap.add_argument("-a", "--attr", type=str, default="name",
 ap.add_argument("-p", "--preprocess", type=str, default="thresh",
 	help="type of preprocessing to be done")
 args = vars(ap.parse_args())
-
-search_on_attr = args['attr']
-
 
 def scan_image(filename):
 	# load the image, resize to 2x, convert to grayscale
@@ -52,23 +46,28 @@ def scan_image(filename):
 	text = text.replace("- ", "-")
 	return text
 
+def similarity(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
 def scan_database(search_on_attr, text):
+	matches = []
+
 	with open('data/AllCards.json') as f:
 		cards = json.load(f)
 
-	matches = []
-	for name,card in cards.items():
-		if 'text' in card:
-			ratio = similar(text, card[search_on_attr])
-			matches.append( (ratio, card,) )
+		for name,card in cards.items():
+			if 'text' in card:
+				ratio = similarity(text, card[search_on_attr])
+				matches.append( (ratio, card,) )
 
 	matches = sorted( matches, key=itemgetter(0), reverse=True )
 	return matches
 
 def print_matches(matches):
 	for match in matches[0:5]:
-		print match[0], match[1]['name'],
-		print search_on_attr, '=', match[1][search_on_attr],
+		print "confidence =", match[0]
+		print "name =", match[1]['name']
+		print args['attr'], '=', match[1][args['attr']]
 		print
 
 text = scan_image(args["image"])
