@@ -3,7 +3,7 @@ Scan and recognize Magic the Gathering cards
 
 
 ## Setup
-You'll need Python 2.7, OpenCV, and Tesseract.
+You'll need Python 2.7, OpenCV, and Tesseract OCR.
 On Mac OS it's helpful to use a virtual environment to avoid package collisions:
 
 ```
@@ -18,11 +18,14 @@ pip install -r requirements.txt`
 
 ## Running
 ```
-python ocr.py -i 140.jpg -a text
+python src/ocr.py -i images/140.jpg -a text
 ```
 
 
 ## References
 
-1. https://github.com/mtgjson/mtgjson
-2. http://magiccards.info/query?q=wolf&v=card&s=cname
+1. http://opencv.org/
+2. https://github.com/tesseract-ocr/tesseract
+3. https://github.com/mtgjson/mtgjson
+4. http://magiccards.info/query?q=wolf&v=card&s=cname
+

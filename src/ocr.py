@@ -50,7 +50,7 @@ os.remove(filename)
 print(text)
 
 
-with open('AllCards.json') as f:
+with open('data/AllCards.json') as f:
 	cards = json.load(f)
 
 matches = []
