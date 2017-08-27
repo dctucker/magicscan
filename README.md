@@ -13,7 +13,7 @@ source bin/activate
 
 Run pip install dependent packages:
 ```
-pip install -r requirements.txt`
+pip install -r requirements.txt
 ```
 
 ## Running
