@@ -16,39 +16,9 @@ ap.add_argument("-p", "--preprocess", type=str, default="thresh",
 	help="type of preprocessing to be done")
 args = vars(ap.parse_args())
 
-def scan_image(filename):
-	# load the image, resize to 2x, convert to grayscale
-	image = cv2.imread(filename)
-	image = cv2.resize(image, None, fx = 2, fy = 2, interpolation = cv2.INTER_CUBIC)
-	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	 
-	# apply threshold or blur
-	if args["preprocess"] == "thresh":
-		gray = cv2.threshold(gray, 0, 255,
-			cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-	elif args["preprocess"] == "blur":
-		gray = cv2.medianBlur(gray, 3)
-	 
-	# write grayscale image to disk as a temporary file for ORC
-	filename = "{}.png".format(os.getpid())
-	cv2.imwrite(filename, gray)
-
-	# debug: show images
-	#cv2.imshow("Image", image)
-	#cv2.imshow("Output", gray)
-	#cv2.waitKey(0)
-
-	# load the image as a PIL/Pillow image
-	text = pytesseract.image_to_string(Image.open(filename))
-	os.remove(filename)
-	text = text.replace("\n", " ")
-	text = text.replace("  ", " ")
-	text = text.replace("- ", "-")
-	return text
-
 def segment_and_scan(filename):
 	image = cv2.imread(filename)
-	image = cv2.resize(image, None, fx = 2, fy = 2, interpolation = cv2.INTER_CUBIC)
+	image = cv2.resize(image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 	h, w, channels = image.shape
 	filename = "{}.png".format(os.getpid())
 
@@ -61,10 +31,11 @@ def segment_and_scan(filename):
 	#clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
 	#cl = clahe.apply(l)
 	#gray = cl
+	image = cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 21)
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 	#gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-	title_image = gray[ 0:int(0.10 * h), int(0.04 * w):int(0.85 * w) ] 
+	title_image = gray[ int(0.02 * h):int(0.10 * h), int(0.04 * w):int(0.85 * w) ]
 	cv2.imwrite(filename, title_image)
 	text = pytesseract.image_to_string(Image.open(filename))
 	title = text.split("\n")[0]
@@ -76,11 +47,20 @@ def segment_and_scan(filename):
 	description = text
 	os.remove(filename)
 
+	series_image = gray[ int(0.93 * h):, 0:int(0.2 * w) ]
+	series_image = cv2.resize(series_image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
+	cv2.imwrite(filename, series_image)
+	text = pytesseract.image_to_string(Image.open(filename))
+	#series = text.split("\n")[0].split("/")
+	series = text
+	os.remove(filename)
+
 	cv2.imshow("Title", title_image)
 	cv2.imshow("Description", description_image)
+	cv2.imshow("Series", series_image)
 	#cv2.waitKey(0)
 
-	return title, description
+	return {'title': title, 'description': description, 'series': series}
 
 
 def similarity(a, b):
@@ -114,10 +94,18 @@ def print_matches(matches):
 		print
 
 #text = scan_image(args["image"])
-title, description = segment_and_scan(args["image"])
+scanned = segment_and_scan(args["image"])
+locals().update(scanned)
 print "Scanned text:"
-print title, '/', description
+print title, '/', description, '/', series
+
+if len(title) < 4:
+	title_weight = 0.01
+elif len(title) < 8:
+	title_weight = 0.5
+else:
+	title_weight = 0.9
 #print
-matches = scan_database([('name', title, 1.0), ('text', description, 0.25)])
+matches = scan_database([('name', title, title_weight), ('text', description, 1.0)])
 print "Matches:"
 print_matches(matches)
