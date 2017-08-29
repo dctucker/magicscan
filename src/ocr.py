@@ -49,35 +49,53 @@ def scan_image(filename):
 def segment_and_scan(filename):
 	image = cv2.imread(filename)
 	height, width, channels = image.shape
+	filename = "{}.png".format(os.getpid())
 
-	contours,hierarchy = cv2.findContours(thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-	cnt = contours[0]
-	x,y,w,h = cv2.boundingRect(cnt)
+	#contours,hierarchy = cv2.findContours(0,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+	#cnt = contours[0]
+	#x,y,w,h = cv2.boundingRect(cnt)
 
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	gray = gray[ 0:int(height * 0.10), 1:int(width * 0.85) ] 
-	gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-	filename = "{}.png".format(os.getpid())
-	cv2.imwrite(filename, gray)
+	#gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+	title_image = gray[ 0:int(height * 0.10), 1:int(width * 0.85) ] 
+	cv2.imwrite(filename, title_image)
 	text = pytesseract.image_to_string(Image.open(filename))
-	cv2.imshow("Output", gray)
-	cv2.waitKey(0)
-	return text
+	title = text.split("\n")[0]
+	os.remove(filename)
+
+	description_image = gray[ int(height * 0.55):int(height * 0.93), int(width * 0.05):int(width * 0.95) ] 
+	cv2.imwrite(filename, description_image)
+	text = pytesseract.image_to_string(Image.open(filename))
+	description = text
+	os.remove(filename)
+
+	#cv2.imshow("Title", title_image)
+	#cv2.imshow("Description", description_image)
+	#cv2.waitKey(0)
+
+	return title, description
 
 
 def similarity(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
-def scan_database(search_on_attr, text):
+def scan_database(search):
 	matches = []
 
 	with open('data/AllCards.json') as f:
 		cards = json.load(f)
 
 		for name,card in cards.items():
-			if 'text' in card:
-				ratio = similarity(text, card[search_on_attr])
-				matches.append( (ratio, card,) )
+			ratio = 0
+			denom = 0
+			for key,value,weight in search:
+				if key in card:
+					ratio += weight * similarity(value, card[key])
+					denom += weight
+			if denom > 1.0:
+				ratio /= denom
+			matches.append( (ratio, card,) )
 
 	matches = sorted( matches, key=itemgetter(0), reverse=True )
 	return matches
@@ -90,10 +108,10 @@ def print_matches(matches):
 		print
 
 #text = scan_image(args["image"])
-text = segment_and_scan(args["image"])
-print "Scanned text:"
-print text
-#matches = scan_database(args['attr'], text)
+title, description = segment_and_scan(args["image"])
+#print "Scanned text:"
+#print title, description
 #print
-#print "Matches:"
-#print_matches(matches)
+matches = scan_database([('name', title, 1.0), ('text', description, 0.25)])
+print "Matches:"
+print_matches(matches)
