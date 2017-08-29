@@ -1,4 +1,5 @@
 from PIL import Image
+from bunch import Bunch
 import pytesseract
 import argparse
 import cv2
@@ -10,13 +11,14 @@ from operator import itemgetter
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True,
 	help="path to input image to be OCR'd")
-ap.add_argument("-a", "--attr", type=str, default="name",
-	help="attribute to search on")
-ap.add_argument("-p", "--preprocess", type=str, default="thresh",
-	help="type of preprocessing to be done")
 args = vars(ap.parse_args())
 
+
 def segment_and_scan(filename):
+	"""Segment, preprocess, and OCR-scan an image given a filename
+	
+	returns a dict with text from each segment
+	"""
 	image = cv2.imread(filename)
 	image = cv2.resize(image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 	h, w, channels = image.shape
@@ -64,9 +66,15 @@ def segment_and_scan(filename):
 
 
 def similarity(a, b):
-    return SequenceMatcher(None, a, b).ratio()
+	return SequenceMatcher(None, a, b).ratio()
+
 
 def scan_database(search):
+	"""Scan for a card in the database given attributes to search
+
+	search should be an array of triples [(attr to search, search string, weight)]
+	returns [(ratio, card), ...]
+	"""
 	matches = []
 
 	with open('data/AllCards.json') as f:
@@ -79,6 +87,8 @@ def scan_database(search):
 				if key in card:
 					ratio += weight * similarity(value, card[key])
 					denom += weight
+				else:
+					card[key] = None
 			if denom > 1.0:
 				ratio /= denom
 			matches.append( (ratio, card,) )
@@ -86,26 +96,26 @@ def scan_database(search):
 	matches = sorted( matches, key=itemgetter(0), reverse=True )
 	return matches
 
+
 def print_matches(matches):
 	for match in matches[0:5]:
 		print "confidence =", match[0]
 		print "name =", match[1]['name']
-		print args['attr'], '=', match[1][args['attr']]
+		print "text =", match[1]['text']
 		print
 
-#text = scan_image(args["image"])
-scanned = segment_and_scan(args["image"])
-locals().update(scanned)
-print "Scanned text:"
-print title, '/', description, '/', series
 
-if len(title) < 4:
+scan = Bunch(segment_and_scan(args["image"]))
+print "Scanned text:"
+print scan.title, '/', scan.description, '/', scan.series
+
+if len(scan.title) < 4:
 	title_weight = 0.01
-elif len(title) < 8:
+elif len(scan.title) < 8:
 	title_weight = 0.5
 else:
 	title_weight = 0.9
 #print
-matches = scan_database([('name', title, title_weight), ('text', description, 1.0)])
+matches = scan_database([('name', scan.title, title_weight), ('text', scan.description, 1.0)])
 print "Matches:"
 print_matches(matches)

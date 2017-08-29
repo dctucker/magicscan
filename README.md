@@ -18,7 +18,7 @@ pip install -r requirements.txt
 
 ## Running
 ```
-python src/ocr.py -i images/140.jpg -a text
+python src/ocr.py -i images/140.jpg
 ```
 
 
