@@ -8,7 +8,7 @@ On Mac OS it's helpful to use a virtual environment to avoid package collisions:
 
 ```
 virtualenv env
-source bin/activate
+source env/bin/activate
 ```
 
 Run pip install dependent packages:
