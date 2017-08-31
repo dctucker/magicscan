@@ -2,3 +2,5 @@ opencv-python
 pillow
 pytesseract
 bunch
+behave
+pyhamcrest

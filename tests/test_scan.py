@@ -1,5 +1,5 @@
 import unittest
-from ocr import *
+from src.ocr import *
 
 class test_scan(unittest.TestCase):
 	def test_scan(self):
