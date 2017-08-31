@@ -1,0 +1,41 @@
+{
+  "Aspect of Wolf": {
+    "layout": "normal",
+    "name": "Aspect of Wolf",
+    "manaCost": "{1}{G}",
+    "cmc": 2,
+    "colors": [
+      "Green"
+    ],
+    "type": "Enchantment — Aura",
+    "types": [
+      "Enchantment"
+    ],
+    "subtypes": [
+      "Aura"
+    ],
+    "text": "Enchant creature\nEnchanted creature gets +X/+Y, where X is half the number of Forests you control, rounded down, and Y is half the number of Forests you control, rounded up.",
+    "imageName": "aspect of wolf",
+    "colorIdentity": [
+      "G"
+    ]
+  },
+  "AWOL": {
+    "layout": "normal",
+    "name": "AWOL",
+    "manaCost": "{2}{W}",
+    "cmc": 3,
+    "colors": [
+      "White"
+    ],
+    "type": "Instant",
+    "types": [
+      "Instant"
+    ],
+    "text": "Remove target attacking creature from the game. Then remove it from the removed-from-game zone and put it into the absolutely-removed-from-the-freaking-game-forever zone.",
+    "imageName": "awol",
+    "colorIdentity": [
+      "W"
+    ]
+  }
+}
