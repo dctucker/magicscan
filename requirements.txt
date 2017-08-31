@@ -2,4 +2,3 @@ opencv-python
 pillow
 pytesseract
 bunch
-pyunit

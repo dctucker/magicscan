@@ -26,13 +26,13 @@ class CardImage:
 		returns a dict with text from each segment
 		"""
 
-		title, title_image = self.crop_segment( 0.04, 0.01, 0.85, 0.10 )
+		title, title_image = self.scan_and_crop( 0.04, 0.01, 0.85, 0.10 )
 		title = title.split("\n")[0]
 
-		description, description_image = self.crop_segment( 0.05, 0.63, 0.95, 0.93 )
+		description, description_image = self.scan_and_crop( 0.05, 0.63, 0.95, 0.93 )
 
 		self.gray = cv2.resize(self.gray, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
-		series, series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
+		series, series_image = self.scan_and_crop( 0, 0.93, 0.2, 1 )
 		#series = series.split("\n")[0].split("/")
 
 		cv2.imshow("Title", title_image)
@@ -57,16 +57,23 @@ class CardImage:
 			'series': series
 		}
 
+	def scan_and_crop(self, left, top, right, bottom):
+		cropped = self.crop_segment(left, top, right, bottom)
+		text = self.scan_segment(cropped)
+		return text, cropped
+
 	def crop_segment(self, left, top, right, bottom):
 		h, w, channels = self.image.shape
 		h -= 1
 		w -= 1
 		cropped = self.gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
+		return cropped
+
+	def scan_segment(self, cropped):
 		cv2.imwrite(self.temp_filename, cropped)
 		text = pytesseract.image_to_string(Image.open(self.temp_filename))
-		title = text.split("\n")[0]
 		os.remove(self.temp_filename)
-		return text, cropped
+		return text
 
 
 class CardDb:
