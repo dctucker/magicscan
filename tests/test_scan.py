@@ -11,6 +11,3 @@ class test_scan(unittest.TestCase):
 		first = matches[0]
 		self.assertGreater( first[0], 0.5 )
 		self.assertEquals(  first[1]['name'], 'AWOL' )
-
-if __name__ == '__main__':
-	unittest.main()
