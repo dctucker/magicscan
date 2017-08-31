@@ -14,73 +14,74 @@ ap.add_argument("-i", "--image", required=True,
 args = vars(ap.parse_args())
 
 
-def segment_and_scan(filename):
-	"""Segment, preprocess, and OCR-scan an image given a filename
-	
-	returns a dict with text from each segment
-	"""
-	image = cv2.imread(filename)
-	image = cv2.resize(image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
-	h, w, channels = image.shape
-	filename = "{}.png".format(os.getpid())
+def CardImage:
+	def __init__(self, filename):
+		self.image = cv2.imread(filename)
+		self.image = cv2.resize(image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
+		self.image = cv2.fastNlMeansDenoisingColored(self.image, None, 10, 10, 7, 21)
+		self.temp_filename = "{}.png".format(os.getpid())
 
-	#contours,hierarchy = cv2.findContours(0,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-	#cnt = contours[0]
-	#x,y,w,h = cv2.boundingRect(cnt)
+	def segment_and_scan(self, filename):
+		"""Segment, preprocess, and OCR-scan an image given a filename
+		
+		returns a dict with text from each segment
+		"""
+		h, w, channels = self.image.shape
 
-	#lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
-	#l, a, b = cv2.split(lab)
-	#clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-	#cl = clahe.apply(l)
-	#gray = cl
-	image = cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 21)
-	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	#gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+		#gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-	title_image = gray[ int(0.02 * h):int(0.10 * h), int(0.04 * w):int(0.85 * w) ]
-	cv2.imwrite(filename, title_image)
-	text = pytesseract.image_to_string(Image.open(filename))
-	title = text.split("\n")[0]
-	os.remove(filename)
+		title, title_image = crop_segment( 0.04, 0.02, 0.85, 0.04 )
+		title = title.split("\n")[0]
 
-	description_image = gray[ int(0.63 * h):int(0.93 * h), int(0.05 * w):int(0.95 * w) ]
-	cv2.imwrite(filename, description_image)
-	text = pytesseract.image_to_string(Image.open(filename))
-	description = text
-	os.remove(filename)
+		description, description_image = gray[ int(0.63 * h):int(0.93 * h), int(0.05 * w):int(0.95 * w) ]
+		cv2.imwrite(filename, description_image)
+		text = pytesseract.image_to_string(Image.open(filename))
+		description = text
+		os.remove(filename)
 
-	series_image = gray[ int(0.93 * h):, 0:int(0.2 * w) ]
-	series_image = cv2.resize(series_image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
-	cv2.imwrite(filename, series_image)
-	text = pytesseract.image_to_string(Image.open(filename))
-	#series = text.split("\n")[0].split("/")
-	series = text
-	os.remove(filename)
+		series_image = gray[ int(0.93 * h):, 0:int(0.2 * w) ]
+		series_image = cv2.resize(series_image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
+		cv2.imwrite(filename, series_image)
+		text = pytesseract.image_to_string(Image.open(filename))
+		#series = text.split("\n")[0].split("/")
+		series = text
+		os.remove(filename)
 
-	cv2.imshow("Title", title_image)
-	cv2.imshow("Description", description_image)
-	cv2.imshow("Series", series_image)
-	#cv2.waitKey(0)
+		cv2.imshow("Title", title_image)
+		cv2.imshow("Description", description_image)
+		cv2.imshow("Series", series_image)
+		#cv2.waitKey(0)
 
-	return {'title': title, 'description': description, 'series': series}
+		return {'title': title, 'description': description, 'series': series}
 
-
-def similarity(a, b):
-	return SequenceMatcher(None, a, b).ratio()
+	def crop_segment(self, left, top, right, bottom):
+		cropped = gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
+		cv2.imwrite(self.temp_filename, cropped)
+		text = pytesseract.image_to_string(Image.open(self.temp_filename))
+		title = text.split("\n")[0]
+		os.remove(self.temp_filename)
+		return text, cropped
 
 
-def scan_database(search):
-	"""Scan for a card in the database given attributes to search
+class CardDb:
+	def __init__(self, filename):
+		with open(filename) as f:
+			self.cards = json.load(f)
 
-	search should be an array of triples [(attr to search, search string, weight)]
-	returns [(ratio, card), ...]
-	"""
-	matches = []
 
-	with open('data/AllCards.json') as f:
-		cards = json.load(f)
+	def scan_database(self, search):
+		"""Scan for a card in the database given attributes to search
 
-		for name,card in cards.items():
+		search should be an array of triples [(attr to search, search string, weight)]
+		returns [(ratio, card), ...]
+		"""
+		matches = []
+
+		def similarity(a, b):
+			return SequenceMatcher(None, a, b).ratio()
+
+		for name,card in self.cards.items():
 			ratio = 0
 			denom = 0
 			for key,value,weight in search:
@@ -93,8 +94,8 @@ def scan_database(search):
 				ratio /= denom
 			matches.append( (ratio, card,) )
 
-	matches = sorted( matches, key=itemgetter(0), reverse=True )
-	return matches
+		matches = sorted( matches, key=itemgetter(0), reverse=True )
+		return matches
 
 
 def print_matches(matches):
@@ -105,7 +106,7 @@ def print_matches(matches):
 		print
 
 
-scan = Bunch(segment_and_scan(args["image"]))
+scan = CardImage(args["image"]).segment_and_scan()
 print "Scanned text:"
 print scan.title, '/', scan.description, '/', scan.series
 
@@ -115,7 +116,8 @@ elif len(scan.title) < 8:
 	title_weight = 0.5
 else:
 	title_weight = 0.9
-#print
-matches = scan_database([('name', scan.title, title_weight), ('text', scan.description, 1.0)])
+
+db = CardDb('data/AllCards.json')
+matches = db.scan_database([('name', scan.title, title_weight), ('text', scan.description, 1.0)])
 print "Matches:"
 print_matches(matches)
