@@ -8,55 +8,60 @@ import json
 from difflib import SequenceMatcher
 from operator import itemgetter
 
-ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--image", required=True,
-	help="path to input image to be OCR'd")
-args = vars(ap.parse_args())
 
-
-def CardImage:
+class CardImage:
 	def __init__(self, filename):
 		self.image = cv2.imread(filename)
-		self.image = cv2.resize(image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
+		self.image = cv2.resize(self.image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 		self.image = cv2.fastNlMeansDenoisingColored(self.image, None, 10, 10, 7, 21)
 		self.temp_filename = "{}.png".format(os.getpid())
 
-	def segment_and_scan(self, filename):
+		self.gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+		#self.gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+		self.gray = self.image
+
+	def segment_and_scan(self):
 		"""Segment, preprocess, and OCR-scan an image given a filename
 		
 		returns a dict with text from each segment
 		"""
-		h, w, channels = self.image.shape
 
-		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-		#gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-
-		title, title_image = crop_segment( 0.04, 0.02, 0.85, 0.04 )
+		title, title_image = self.crop_segment( 0.04, 0.01, 0.85, 0.10 )
 		title = title.split("\n")[0]
 
-		description, description_image = gray[ int(0.63 * h):int(0.93 * h), int(0.05 * w):int(0.95 * w) ]
-		cv2.imwrite(filename, description_image)
-		text = pytesseract.image_to_string(Image.open(filename))
-		description = text
-		os.remove(filename)
+		description, description_image = self.crop_segment( 0.05, 0.63, 0.95, 0.93 )
 
-		series_image = gray[ int(0.93 * h):, 0:int(0.2 * w) ]
-		series_image = cv2.resize(series_image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
-		cv2.imwrite(filename, series_image)
-		text = pytesseract.image_to_string(Image.open(filename))
-		#series = text.split("\n")[0].split("/")
-		series = text
-		os.remove(filename)
+		self.gray = cv2.resize(self.gray, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
+		series, series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
+		#series = series.split("\n")[0].split("/")
 
 		cv2.imshow("Title", title_image)
 		cv2.imshow("Description", description_image)
 		cv2.imshow("Series", series_image)
 		#cv2.waitKey(0)
 
-		return {'title': title, 'description': description, 'series': series}
+		if len(title) < 4:
+			title_weight = 0.01
+		elif len(title) < 8:
+			title_weight = 0.5
+		else:
+			title_weight = 0.9
+
+		return {
+			'title': title,
+			'description': description,
+			'weights': {
+				'title': title_weight,
+				'description': 1.0,
+			},
+			'series': series
+		}
 
 	def crop_segment(self, left, top, right, bottom):
-		cropped = gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
+		h, w, channels = self.image.shape
+		h -= 1
+		w -= 1
+		cropped = self.gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
 		cv2.imwrite(self.temp_filename, cropped)
 		text = pytesseract.image_to_string(Image.open(self.temp_filename))
 		title = text.split("\n")[0]
@@ -97,27 +102,28 @@ class CardDb:
 		matches = sorted( matches, key=itemgetter(0), reverse=True )
 		return matches
 
+	@classmethod
+	def print_matches(cls, matches):
+		for match in matches[0:5]:
+			print "confidence =", match[0]
+			print "name =", match[1]['name']
+			print "text =", match[1]['text']
+			print
 
-def print_matches(matches):
-	for match in matches[0:5]:
-		print "confidence =", match[0]
-		print "name =", match[1]['name']
-		print "text =", match[1]['text']
-		print
 
 
-scan = CardImage(args["image"]).segment_and_scan()
-print "Scanned text:"
-print scan.title, '/', scan.description, '/', scan.series
+if __name__ == '__main__':
+	ap = argparse.ArgumentParser()
+	ap.add_argument("-i", "--image", required=True,
+		help="path to input image to be OCR'd")
+	args = vars(ap.parse_args())
 
-if len(scan.title) < 4:
-	title_weight = 0.01
-elif len(scan.title) < 8:
-	title_weight = 0.5
-else:
-	title_weight = 0.9
+	card_image = CardImage(args["image"])
+	scan = Bunch(card_image.segment_and_scan())
+	print "Scanned text:"
+	print scan.title, '/', scan.description, '/', scan.series
 
-db = CardDb('data/AllCards.json')
-matches = db.scan_database([('name', scan.title, title_weight), ('text', scan.description, 1.0)])
-print "Matches:"
-print_matches(matches)
+	db = CardDb('data/AllCards.json')
+	matches = db.scan_database([('name', scan.title, scan.weights['title']), ('text', scan.description, scan.weights['description'])])
+	print "Matches:"
+	CardDb.print_matches(matches)
