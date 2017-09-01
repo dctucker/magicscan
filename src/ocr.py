@@ -7,6 +7,7 @@ import os
 import json
 from difflib import SequenceMatcher
 from operator import itemgetter
+import sys
 # TODO find logging library so we can set it to error,warn,info,debug levels
 
 class CardImage:
@@ -56,7 +57,7 @@ class CardImage:
 			print "good job!"
 
 		if self.do_ocr:
-			print "Starting OCR...",
+			print "Recognizing characters, optically...",
 			print "title...",
 			title = self.scan_segment(title_image)
 			title = title.split("\n")[0]
@@ -70,6 +71,7 @@ class CardImage:
 
 			print "type...",
 			cardType = self.scan_segment(type_image)
+			print "done!"
 
 			if len(title) < 4:
 				title_weight = 0.01
@@ -145,11 +147,19 @@ class CardDb:
 			print "confidence =", match[0]
 			print "name =", match[1]['name']
 			print "text =", match[1]['text']
+			print "type =", match[1]['type']
 			print
 
 
-
 if __name__ == '__main__':
+	try:
+		print u'\u2014' # TODO how to check encoding w/o printing unecessary characters
+	except UnicodeEncodeError as uee:
+		# TODO improve this message
+		print "Current encoding not supported. Use a terminal which supports unicode."
+		print "for Windows, try 'chcp 1252'"
+		sys.exit(0)
+
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-i", "--image", required=True,
 		help="path to input image to be OCR'd")
@@ -165,7 +175,7 @@ if __name__ == '__main__':
 	print "(or whatever we end up calling it)"
 	print '\n', parsed_args
 	args = vars(parsed_args)
-	print
+	print "current encoding = ",sys.getdefaultencoding(),"\n"
 
 	print "Loading image...",
 	card_image = CardImage(args["image"], args["show_crops"], args["do_ocr"])
@@ -184,7 +194,11 @@ if __name__ == '__main__':
 		print "done!"
 
 		print "Finding card matches...",
-		matches = db.scan_database([('name', scan.title, scan.weights['title']), ('text', scan.description, scan.weights['description'])])
+		matches = db.scan_database([
+			('name', scan.title, scan.weights['title']),
+			('text', scan.description, scan.weights['description']),
+			('type', scan.type, scan.weights['type'])
+			])
 		print "done!"
 		print "\nMatches:"
 		CardDb.print_matches(matches)
