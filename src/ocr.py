@@ -10,7 +10,7 @@ from operator import itemgetter
 
 
 class CardImage:
-	def __init__(self, filename):
+	def __init__(self, filename, show_ocr_crops):
 		self.image = cv2.imread(filename)
 		self.image = cv2.resize(self.image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 		self.image = cv2.fastNlMeansDenoisingColored(self.image, None, 10, 10, 7, 21)
@@ -20,28 +20,37 @@ class CardImage:
 		#self.gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 		self.gray = self.image
 
+		self.show_crops = show_ocr_crops
+
 	def segment_and_scan(self):
 		"""Segment, preprocess, and OCR-scan an image given a filename
 		
 		returns a dict with text from each segment
 		"""
 
+		# croping images
 		title_image = self.crop_segment( 0.04, 0.01, 0.85, 0.10 )
-		title = self.scan_segment(title_image)
-		title = title.split("\n")[0]
-
 		description_image = self.crop_segment( 0.05, 0.63, 0.95, 0.93 )
-		description = self.scan_segment(description_image)
-
+		type_image = self.crop_segment( 0.05, 0.55, 0.95, 0.63 )
+		
 		self.gray = cv2.resize(self.gray, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 		series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
-		series = self.scan_segment(series_image)
-		#series = series.split("\n")[0].split("/")
+		
+		if self.show_crops:
+			cv2.imshow("Title", title_image)
+			cv2.imshow("Description", description_image)
+			cv2.imshow("Series", series_image)
+			cv2.imshow("Type", type_image)
+			cv2.waitKey(0)
 
-		cv2.imshow("Title", title_image)
-		cv2.imshow("Description", description_image)
-		cv2.imshow("Series", series_image)
-		#cv2.waitKey(0)
+		if self.do_ocr:
+			title = self.scan_segment(title_image)
+			title = title.split("\n")[0]
+
+			description = self.scan_segment(description_image)
+
+			series = self.scan_segment(series_image)
+			#series = series.split("\n")[0].split("/")
 
 		if len(title) < 4:
 			title_weight = 0.01
@@ -56,6 +65,7 @@ class CardImage:
 			'weights': {
 				'title': title_weight,
 				'description': 1.0,
+				'type': 1.0 #TODO vary the weight
 			},
 			'series': series
 		}
@@ -121,9 +131,15 @@ if __name__ == '__main__':
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-i", "--image", required=True,
 		help="path to input image to be OCR'd")
+	ap.add_argument("-s", "--show-ocr-crops", required=False, action="store_true", default=False,
+		help="show the image results of OCR")
+	ap.add_argument("-k", "--skip-ocr", required=False, action="store_true", default=False,
+		help="skips ocr scans")
 	args = vars(ap.parse_args())
 
-	card_image = CardImage(args["image"])
+	print "show_ocr=", args["show_ocr_crops"]
+
+	card_image = CardImage(args["image"], args["show_ocr_crops"])
 	scan = Bunch(card_image.segment_and_scan())
 	print "Scanned text:"
 	print scan.title, '/', scan.description, '/', scan.series
