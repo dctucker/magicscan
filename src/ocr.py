@@ -13,6 +13,7 @@ from decorators import *
 # TODO find logging library so we can set it to error,warn,info,debug levels
 
 class CardImage:
+	@timed("Load image")
 	def __init__(self, filename, show_crops=False, do_ocr=True):
 		self.image = cv2.imread(filename)
 		self.image = cv2.resize(self.image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
