@@ -11,7 +11,7 @@ import sys
 # TODO find logging library so we can set it to error,warn,info,debug levels
 
 class CardImage:
-	def __init__(self, filename, show_crops, do_ocr):
+	def __init__(self, filename, show_crops=False, do_ocr=True):
 		self.image = cv2.imread(filename)
 		self.image = cv2.resize(self.image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 		self.image = cv2.fastNlMeansDenoisingColored(self.image, None, 10, 10, 7, 21)
@@ -202,4 +202,4 @@ if __name__ == '__main__':
 		print "done!"
 		print "\nMatches:"
 		CardDb.print_matches(matches)
-	
+
