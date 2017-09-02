@@ -17,10 +17,10 @@ class CardImage:
 	def __init__(self, filename, show_crops=False, do_ocr=True):
 		self.image = cv2.imread(filename)
 		self.image = cv2.resize(self.image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
-		self.image = cv2.fastNlMeansDenoisingColored(self.image, None, 10, 10, 7, 21)
 		self.temp_filename = "{}.png".format(os.getpid())
 
 		self.gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+		self.gray = cv2.fastNlMeansDenoising(self.gray, None, 10)
 		#self.gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 		self.gray = self.image
 
