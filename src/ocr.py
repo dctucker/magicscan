@@ -153,7 +153,7 @@ class CardDb:
 
 if __name__ == '__main__':
 	try:
-		print u'\u2014' # TODO how to check encoding w/o printing unecessary characters
+		u'\u2014'.encode(sys.stdout.encoding)
 	except UnicodeEncodeError as uee:
 		# TODO improve this message
 		print "Current encoding not supported. Use a terminal which supports unicode."
