@@ -8,9 +8,12 @@ import json
 from difflib import SequenceMatcher
 from operator import itemgetter
 import sys
+from decorators import *
+
 # TODO find logging library so we can set it to error,warn,info,debug levels
 
 class CardImage:
+	@timed("Load image")
 	def __init__(self, filename, show_crops=False, do_ocr=True):
 		self.image = cv2.imread(filename)
 		self.image = cv2.resize(self.image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
@@ -101,6 +104,7 @@ class CardImage:
 		cropped = self.gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
 		return cropped
 
+	@timed("OCR")
 	def scan_segment(self, cropped):
 		cv2.imwrite(self.temp_filename, cropped)
 		text = pytesseract.image_to_string(Image.open(self.temp_filename))
@@ -114,6 +118,7 @@ class CardDb:
 			self.cards = json.load(f)
 
 
+	@timed("Scanning database")
 	def scan_database(self, search):
 		"""Scan for a card in the database given attributes to search
 
