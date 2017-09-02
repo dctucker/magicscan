@@ -54,7 +54,6 @@ class CardImage:
 			cv2.imshow("Description", description_image)
 			cv2.imshow("Series", series_image)
 			cv2.imshow("Type", type_image)
-			print "done!"
 			print "Press any key to continue...",
 			cv2.waitKey(0)
 			print "good job!"
@@ -113,12 +112,12 @@ class CardImage:
 
 
 class CardDb:
+	@timed("Loading DB")
 	def __init__(self, filename):
 		with open(filename) as f:
 			self.cards = json.load(f)
 
-
-	@timed("Scanning database")
+	@timed("Scanning DB")
 	def scan_database(self, search):
 		"""Scan for a card in the database given attributes to search
 
@@ -126,25 +125,30 @@ class CardDb:
 		returns [(ratio, card), ...]
 		"""
 		matches = []
-
-		def similarity(a, b):
-			return SequenceMatcher(None, a, b).ratio()
-
 		for name,card in self.cards.items():
-			ratio = 0
-			denom = 0
-			for key,value,weight in search:
-				if key in card:
-					ratio += weight * similarity(value, card[key])
-					denom += weight
-				else:
-					card[key] = None
-			if denom > 1.0:
-				ratio /= denom
-			matches.append( (ratio, card,) )
+			match = self.compare_card(card, search)
+			if match[0] > 0.1:
+				matches.append( match )
 
 		matches = sorted( matches, key=itemgetter(0), reverse=True )
 		return matches
+
+	def compare_card(self, card, search):
+		def similarity(a, b):
+			return SequenceMatcher(None, a, b).ratio()
+
+		ratio = 0
+		denom = 0
+		for key,value,weight in search:
+			if key in card:
+				ratio += weight * similarity(value, card[key])
+				denom += weight
+			else:
+				card[key] = None
+		if denom > 1.0:
+			ratio /= denom
+
+		return (ratio, card,)
 
 	@classmethod
 	def print_matches(cls, matches):
@@ -194,11 +198,9 @@ if __name__ == '__main__':
 		print scan.title, '/', scan.description, '/', scan.series, '/', scan.type
 
 	if args["do_lookup"] and hasScanData:
-		print "Loading DB...",
 		db = CardDb('data/AllCards.json')
-		print "done!"
 
-		print "Finding card matches...",
+		print "Scanning", len(db.cards), "cards..."
 		matches = db.scan_database([
 			('name', scan.title, scan.weights['title']),
 			('text', scan.description, scan.weights['description']),
