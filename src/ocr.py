@@ -9,6 +9,7 @@ from difflib import SequenceMatcher
 from operator import itemgetter
 import sys
 from decorators import *
+import numpy as np
 
 
 # TODO find logging library so we can set it to error,warn,info,debug levels
@@ -18,14 +19,27 @@ class SymbolDB:
 	def __init__(self):
 		path = 'data/symbols/png'
 		self.files = [ f for f in os.listdir(path) if ".png" in f ]
+		self.files = ('soi.png','unh.png')
 		self.images = {}
 		for filename in self.files:
 			key = filename.replace(".png", "")
-			image = cv2.imread(path+"/"+filename)
+			image = cv2.imread(path+"/"+filename, cv2.IMREAD_UNCHANGED)
+			image = cv2.split(image)[-1]
+			#image = cv2.Laplacian( image, cv2.CV_64F )
+			cv2.imshow(filename, image)
 			self.images[ key ] = image
 
-symbols = SymbolDB()
-print symbols.images
+	@timed("Determining series")
+	def determine_series(self, image):
+		matches = []
+		for series, template in self.images.items():
+			#for series in ('soi','unh'):
+			template = self.images[ series ]
+			res = cv2.matchTemplate(image.astype(np.uint8), template.astype(np.uint8),  cv2.TM_SQDIFF_NORMED)
+			matches += [( np.sum( res ), series )]
+		return sorted( matches, key=itemgetter(0), reverse=True )
+
+symbol_db = SymbolDB()
 
 class CardImage:
 	@timed("Load image")
@@ -58,11 +72,16 @@ class CardImage:
 		print "type...",
 		type_image = self.crop_segment( 0.05, 0.55, 0.85, 0.63 )
 
-		print "symbol...",		
+		self.gray = cv2.resize(self.gray, None, fx = 2, fy = 2, interpolation = cv2.INTER_CUBIC)
+		print "symbol...",
 		symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.63 )
+		gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
+		symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
+		#symbol_image = cv2.Laplacian( symbol_image, cv2.CV_64F )
+		symbol_image = 255 - (symbol_image)
 
-		print "series...",		
-		self.gray = cv2.resize(self.gray, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
+		print "series...",
+		self.gray = cv2.resize(self.gray, None, fx = 2, fy = 2, interpolation = cv2.INTER_CUBIC)
 		series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
 
 		print "done!"
@@ -81,8 +100,11 @@ class CardImage:
 			cv2.moveWindow("Type",         sw/3, int(sh*0.2) )
 			cv2.moveWindow("Symbol",    sw-sw/4, int(sh*0.2) )
 			print "Press any key to continue...",
+			print symbol_db.determine_series( symbol_image )
 			cv2.waitKey(0)
 			print "good job!"
+
+
 
 		if self.do_ocr:
 			print "Recognizing characters, optically...",
@@ -123,7 +145,7 @@ class CardImage:
 		return None
 
 	def crop_segment(self, left, top, right, bottom):
-		h, w, channels = self.image.shape
+		h, w = self.gray.shape
 		h -= 1
 		w -= 1
 		cropped = self.gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
@@ -217,7 +239,7 @@ if __name__ == '__main__':
 	print "done!"
 
 	segments = card_image.segment_and_scan()
-	hasScanData = not segments is None
+	hasScanData = segments is not None
 	if hasScanData:
 		scan = Bunch(segments)
 		print "\nScanned text:"
