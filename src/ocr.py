@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageGrab
 from bunch import Bunch
 import pytesseract
 import argparse
@@ -41,11 +41,15 @@ class CardImage:
 		print "description...",
 		description_image = self.crop_segment( 0.05, 0.63, 0.95, 0.93 )
 		print "type...",
-		type_image = self.crop_segment( 0.05, 0.55, 0.99, 0.63 )
+		type_image = self.crop_segment( 0.05, 0.55, 0.85, 0.63 )
+
+		print "symbol...",		
+		symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.63 )
 
 		print "series...",		
 		self.gray = cv2.resize(self.gray, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 		series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
+
 		print "done!"
 		
 		if self.show_crops:
@@ -53,7 +57,14 @@ class CardImage:
 			cv2.imshow("Title", title_image)
 			cv2.imshow("Description", description_image)
 			cv2.imshow("Series", series_image)
+			cv2.imshow("Symbol", symbol_image)
 			cv2.imshow("Type", type_image)
+			sw, sh = ImageGrab.grab().size
+			cv2.moveWindow("Title",        sw/3, int(sh*0.1) )
+			cv2.moveWindow("Description",  sw/3, int(sh*0.3) )
+			cv2.moveWindow("Series",       sw/3, int(sh*0.7) )
+			cv2.moveWindow("Type",         sw/3, int(sh*0.2) )
+			cv2.moveWindow("Symbol",    sw-sw/4, int(sh*0.2) )
 			print "Press any key to continue...",
 			cv2.waitKey(0)
 			print "good job!"
