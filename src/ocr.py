@@ -10,7 +10,22 @@ from operator import itemgetter
 import sys
 from decorators import *
 
+
 # TODO find logging library so we can set it to error,warn,info,debug levels
+
+class SymbolDB:
+	@timed("Load image")
+	def __init__(self):
+		path = 'data/symbols/png'
+		self.files = [ f for f in os.listdir(path) if ".png" in f ]
+		self.images = {}
+		for filename in self.files:
+			key = filename.replace(".png", "")
+			image = cv2.imread(path+"/"+filename)
+			self.images[ key ] = image
+
+symbols = SymbolDB()
+print symbols.images
 
 class CardImage:
 	@timed("Load image")
@@ -22,7 +37,7 @@ class CardImage:
 		self.gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 		self.gray = cv2.fastNlMeansDenoising(self.gray, None, 10)
 		#self.gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-		self.gray = self.image
+		#self.gray = self.image
 
 		self.show_crops = show_crops
 		self.do_ocr = do_ocr
