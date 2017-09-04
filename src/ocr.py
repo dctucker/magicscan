@@ -4,7 +4,7 @@ import pytesseract
 import argparse
 import cv2
 import os
-import json
+from db import CardDb
 from difflib import SequenceMatcher
 from operator import itemgetter
 import sys
@@ -18,8 +18,8 @@ class SymbolDB:
 	@timed("Load image")
 	def __init__(self):
 		path = 'data/symbols/png'
+		self.files = ('bng.png','fut.png','bcore.png','all.png','soi.png','unh.png')
 		self.files = [ f for f in os.listdir(path) if ".png" in f ]
-		self.files = ('bcore.png','all.png','soi.png','unh.png')
 		self.images = {}
 		count = 0
 		for filename in self.files:
@@ -35,21 +35,25 @@ class SymbolDB:
 			#image = image.convertTo( cv2.CV_8U )
 			#laplace = cv2.Laplacian( image, cv2.CV_64F, cv2.CV_16S, 5 )
 			#image = cv2.convertScaleAbs( laplace )
-			cv2.imshow(filename, image)
-			cv2.moveWindow(filename, count * 140, 200 )
 			self.images[ key ] = image
 			count += 1
+			if count < 10:
+				cv2.imshow(filename, image)
+				cv2.moveWindow(filename, count * 140, 200 )
 
 	@timed("Determining series")
 	def determine_series(self, image):
 		matches = []
+		count = 0
 		for series, template in self.images.items():
 			#for series in ('soi','unh'):
 			template = self.images[ series ]
 			#res = cv2.bitwise_xor( image , template )
 			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF_NORMED)
-			cv2.imshow(series, res.copy())
 			matches += [( np.max( res ), series )]
+			count += 1
+			if count < 10:
+				cv2.imshow(series, res.copy())
 		return sorted( matches, key=itemgetter(0), reverse=True )
 
 symbol_db = SymbolDB()
@@ -85,16 +89,18 @@ class CardImage:
 		print "type...",
 		type_image = self.crop_segment( 0.05, 0.55, 0.85, 0.63 )
 
-		self.gray = cv2.resize(self.gray, None, fx = 1.5, fy = 1.5, interpolation = cv2.INTER_CUBIC)
+		self.gray = cv2.resize(self.gray, None, fx = 1.8, fy = 1.8, interpolation = cv2.INTER_CUBIC)
 		print "symbol...",
-		#symbol_image = self.crop_segment( 0.88, 0.57, 0.955, 0.615 )
-		symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
+		#symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
+		symbol_image = self.crop_segment( 0.88, 0.572, 0.955, 0.615 )
 		#gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
 		#symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
 		#symbol_image = cv2.resize(symbol_image, (138, 138), interpolation = cv2.INTER_CUBIC)
-		blur = cv2.GaussianBlur(symbol_image,(3,3),1)
+		blur = cv2.GaussianBlur(symbol_image,(3,3),11)
 		_, symbol_image = cv2.threshold(blur, 128, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+		#symbol_image = cv2.adaptiveThreshold(symbol_image, 240, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 		symbol_image = 255 - symbol_image
+		symbol_image = cv2.copyMakeBorder(symbol_image,100,100,100,100,cv2.BORDER_CONSTANT,value=(0,0,0))
 		
 		#symbol_image = cv2.threshold(symbol_image, 240, 255, cv2.THRESH_BINARY)
 
@@ -175,54 +181,6 @@ class CardImage:
 		os.remove(self.temp_filename)
 		return text
 
-
-class CardDb:
-	@timed("Loading DB")
-	def __init__(self, filename):
-		with open(filename) as f:
-			self.cards = json.load(f)
-
-	@timed("Scanning DB")
-	def scan_database(self, search):
-		"""Scan for a card in the database given attributes to search
-
-		search should be an array of triples [(attr to search, search string, weight)]
-		returns [(ratio, card), ...]
-		"""
-		matches = []
-		for name,card in self.cards.items():
-			match = self.compare_card(card, search)
-			if match[0] > 0.1:
-				matches.append( match )
-
-		matches = sorted( matches, key=itemgetter(0), reverse=True )
-		return matches
-
-	def compare_card(self, card, search):
-		def similarity(a, b):
-			return SequenceMatcher(None, a, b).ratio()
-
-		ratio = 0
-		denom = 0
-		for key,value,weight in search:
-			if key in card:
-				ratio += weight * similarity(value, card[key])
-				denom += weight
-			else:
-				card[key] = None
-		if denom > 1.0:
-			ratio /= denom
-
-		return (ratio, card,)
-
-	@classmethod
-	def print_matches(cls, matches):
-		for match in matches[0:5]:
-			print "confidence =", match[0]
-			print "name =", match[1]['name']
-			print "text =", match[1]['text']
-			print "type =", match[1]['type']
-			print
 
 
 if __name__ == '__main__':
