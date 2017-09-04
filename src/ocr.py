@@ -18,13 +18,21 @@ class SymbolDB:
 	@timed("Load image")
 	def __init__(self):
 		path = 'data/symbols/png'
+		self.files = ('bcore.png','all.png','soi.png','unh.png')
 		self.files = [ f for f in os.listdir(path) if ".png" in f ]
-		self.files = ('soi.png','unh.png')
 		self.images = {}
 		for filename in self.files:
 			key = filename.replace(".png", "")
 			image = cv2.imread(path+"/"+filename, cv2.IMREAD_UNCHANGED)
-			image = cv2.split(image)[-1]
+			print image.shape
+			alpha = cv2.split(image)[-1]
+			image[:,:,0] = alpha
+			image[:,:,1] = alpha
+			image[:,:,2] = alpha
+			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+			image = cv2.GaussianBlur(image, (9,9), 10.0)
+			#image = cv2.split(image)[-1]
+			#image = image.convertTo( cv2.CV_8U )
 			#image = cv2.Laplacian( image, cv2.CV_64F )
 			cv2.imshow(filename, image)
 			self.images[ key ] = image
@@ -35,7 +43,9 @@ class SymbolDB:
 		for series, template in self.images.items():
 			#for series in ('soi','unh'):
 			template = self.images[ series ]
-			res = cv2.matchTemplate(image.astype(np.uint8), template.astype(np.uint8),  cv2.TM_SQDIFF_NORMED)
+			#res = cv2.bitwise_xor( image , template )
+			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF)
+			cv2.imshow(series, res.copy())
 			matches += [( np.sum( res ), series )]
 		return sorted( matches, key=itemgetter(0), reverse=True )
 
@@ -68,20 +78,24 @@ class CardImage:
 		print "title...",
 		title_image = self.crop_segment( 0.04, 0.01, 0.85, 0.10 )
 		print "description...",
-		description_image = self.crop_segment( 0.05, 0.63, 0.95, 0.93 )
+		description_image = self.crop_segment( 0.05, 0.63, 0.99, 0.93 )
 		print "type...",
 		type_image = self.crop_segment( 0.05, 0.55, 0.85, 0.63 )
 
-		self.gray = cv2.resize(self.gray, None, fx = 2, fy = 2, interpolation = cv2.INTER_CUBIC)
+		self.gray = cv2.resize(self.gray, None, fx = 1.5, fy = 1.5, interpolation = cv2.INTER_CUBIC)
 		print "symbol...",
-		symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.63 )
-		gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
-		symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
-		#symbol_image = cv2.Laplacian( symbol_image, cv2.CV_64F )
-		symbol_image = 255 - (symbol_image)
+		#symbol_image = self.crop_segment( 0.88, 0.57, 0.955, 0.615 )
+		symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
+		#gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
+		#symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
+		#symbol_image = 255 - symbol_image
+		#symbol_image = cv2.resize(symbol_image, (138, 138), interpolation = cv2.INTER_CUBIC)
+		symbol_image = cv2.equalizeHist(symbol_image)
+		symbol_image = cv2.adaptiveThreshold(symbol_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+		
+		#symbol_image = cv2.threshold(symbol_image, 240, 255, cv2.THRESH_BINARY)
 
 		print "series...",
-		self.gray = cv2.resize(self.gray, None, fx = 2, fy = 2, interpolation = cv2.INTER_CUBIC)
 		series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
 
 		print "done!"
@@ -149,7 +163,7 @@ class CardImage:
 		h -= 1
 		w -= 1
 		cropped = self.gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
-		return cropped
+		return cropped.copy()
 
 	@timed("OCR")
 	def scan_segment(self, cropped):
