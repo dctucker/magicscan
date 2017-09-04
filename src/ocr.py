@@ -5,7 +5,6 @@ import argparse
 import cv2
 import os
 from db import *
-from difflib import SequenceMatcher
 import sys
 from decorators import *
 import numpy as np
@@ -36,8 +35,15 @@ class CardImage:
 		returns a dict with text from each segment
 		"""
 
-		# croping images
+		self.crop_segments()
+		if self.show_crops:
+			self.show_segments()
+		if self.do_ocr:
+			return self.scan_segments()
+		return None
 
+	@timed("Cropping")
+	def crop_segments(self):
 		print "Segmenting image...",
 		print "title...",
 		title_image = self.crop_segment( 0.04, 0.01, 0.85, 0.10 )
@@ -57,87 +63,79 @@ class CardImage:
 		_, symbol_image = cv2.threshold(blur, 128, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 		#symbol_image = cv2.adaptiveThreshold(symbol_image, 240, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 		symbol_image = 255 - symbol_image
-		symbol_image = cv2.copyMakeBorder(symbol_image,100,100,100,100,cv2.BORDER_CONSTANT,value=(0,0,0))
-		
+		symbol_image = cv2.copyMakeBorder(symbol_image,60,60,60,60,cv2.BORDER_CONSTANT,value=(0,0,0))
 		#symbol_image = cv2.threshold(symbol_image, 240, 255, cv2.THRESH_BINARY)
 
 		print "series...",
 		series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
 
+		self.crops = Bunch({
+			'title': title_image,
+			'type': type_image,
+			'symbol': symbol_image,
+			'description': description_image,
+			'series': series_image
+		})
 		print "done!"
+
+	def show_segments(self):
+		print "Displaying cropped segments...",
+		cv2.imshow("Title", self.crops.title)
+		cv2.imshow("Description", self.crops.description)
+		cv2.imshow("Series", self.crops.series)
+		cv2.imshow("Symbol", self.crops.symbol)
+		cv2.imshow("Type", self.crops.type)
+		sw, sh = ImageGrab.grab().size
+		cv2.moveWindow("Title",        sw/3, int(sh*0.1) )
+		cv2.moveWindow("Description",  sw/3, int(sh*0.3) )
+		cv2.moveWindow("Series",       sw/3, int(sh*0.7) )
+		cv2.moveWindow("Type",         sw/3, int(sh*0.2) )
+		cv2.moveWindow("Symbol",    sw-sw/4, int(sh*0.2) )
+
+		matches = symbol_db.determine_series( self.crops.symbol )
+		symbol_db.show_determination( matches )
+
+		print
+		cv2.waitKey(0)
+		print "Press any key to continue...",
+		print "good job!"
+
+	@timed("OCR")
+	def scan_segments(self):
+		print "Recognizing characters, optically...",
+		print "title...",
+		title = self.scan_segment(self.crops.title)
+		title = title.split("\n")[0]
+
+		print "description...",
+		description = self.scan_segment(self.crops.description)
 		
-		if self.show_crops:
-			print "Displaying cropped segments...",
-			cv2.imshow("Title", title_image)
-			cv2.imshow("Description", description_image)
-			cv2.imshow("Series", series_image)
-			cv2.imshow("Symbol", symbol_image)
-			cv2.imshow("Type", type_image)
-			sw, sh = ImageGrab.grab().size
-			cv2.moveWindow("Title",        sw/3, int(sh*0.1) )
-			cv2.moveWindow("Description",  sw/3, int(sh*0.3) )
-			cv2.moveWindow("Series",       sw/3, int(sh*0.7) )
-			cv2.moveWindow("Type",         sw/3, int(sh*0.2) )
-			cv2.moveWindow("Symbol",    sw-sw/4, int(sh*0.2) )
+		print "series...",
+		series = self.scan_segment(self.crops.series)
+		#series = series.split("\n")[0].split("/")
 
-			matches = symbol_db.determine_series( symbol_image )
-			count = 0
-			for ratio,series,res in matches:
-				print (ratio,series,),
+		print "type...",
+		cardType = self.scan_segment(self.crops.type)
+		print "done!"
 
-				count += 1
-				if count < 10:
-					filename = series + ".png"
-					cv2.imshow(series, res)
-					cv2.imshow(filename, symbol_db.images[series])
-					cv2.moveWindow(series, count * 140, 20 )
-					cv2.moveWindow(filename, count * 140, 200 )
+		if len(title) < 4:
+			title_weight = 0.01
+		elif len(title) < 8:
+			title_weight = 0.5
+		else:
+			title_weight = 0.9
 
-
-			print
-			cv2.waitKey(0)
-			print "Press any key to continue...",
-			print "good job!"
-
-
-
-		if self.do_ocr:
-			print "Recognizing characters, optically...",
-			print "title...",
-			title = self.scan_segment(title_image)
-			title = title.split("\n")[0]
-
-			print "description...",
-			description = self.scan_segment(description_image)
-			
-			print "series...",
-			series = self.scan_segment(series_image)
-			#series = series.split("\n")[0].split("/")
-
-			print "type...",
-			cardType = self.scan_segment(type_image)
-			print "done!"
-
-			if len(title) < 4:
-				title_weight = 0.01
-			elif len(title) < 8:
-				title_weight = 0.5
-			else:
-				title_weight = 0.9
-
-			return {
-				'title': title,
-				'description': description,
-				'weights': {
-					'title': title_weight,
-					'description': 1.0,
-					'type': 1.0 #TODO make sure this is correct
-				},
-				'type': cardType,
-				'series': series
-			}
-		
-		return None
+		return {
+			'title': title,
+			'description': description,
+			'weights': {
+				'title': title_weight,
+				'description': 1.0,
+				'type': 1.0 #TODO make sure this is correct
+			},
+			'type': cardType,
+			'series': series
+		}
 
 	def crop_segment(self, left, top, right, bottom):
 		h, w = self.gray.shape
@@ -146,7 +144,6 @@ class CardImage:
 		cropped = self.gray[ int(top * h):int(bottom * h), int(left * w):int(right * w) ]
 		return cropped.copy()
 
-	@timed("OCR")
 	def scan_segment(self, cropped):
 		cv2.imwrite(self.temp_filename, cropped)
 		text = pytesseract.image_to_string(Image.open(self.temp_filename))

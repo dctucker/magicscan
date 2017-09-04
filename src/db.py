@@ -4,6 +4,7 @@ from operator import itemgetter
 import cv2
 import numpy as np
 from decorators import *
+from difflib import SequenceMatcher
 
 class CardDb:
 	@timed("Loading DB")
@@ -79,6 +80,8 @@ class SymbolDB:
 
 	@timed("Determining series")
 	def determine_series(self, image):
+		# TODO implement multiscale template matching
+
 		matches = []
 		for series, template in self.images.items():
 			#for series in ('soi','unh'):
@@ -87,3 +90,16 @@ class SymbolDB:
 			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF_NORMED)
 			matches += [( np.max( res ), series, res )]
 		return sorted( matches, key=itemgetter(0), reverse=True )
+
+	def show_determination(self, matches):
+		count = 0
+		for ratio,series,res in matches:
+			print (ratio,series,),
+
+			count += 1
+			if count < 10:
+				filename = series + ".png"
+				cv2.imshow(series, res)
+				cv2.imshow(filename, self.images[series])
+				cv2.moveWindow(series, count * 140, 20 )
+				cv2.moveWindow(filename, count * 140, 200 )
