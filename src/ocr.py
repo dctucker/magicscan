@@ -18,24 +18,27 @@ class SymbolDB:
 	@timed("Load image")
 	def __init__(self):
 		path = 'data/symbols/png'
-		self.files = ('bcore.png','all.png','soi.png','unh.png')
 		self.files = [ f for f in os.listdir(path) if ".png" in f ]
+		self.files = ('bcore.png','all.png','soi.png','unh.png')
 		self.images = {}
+		count = 0
 		for filename in self.files:
 			key = filename.replace(".png", "")
 			image = cv2.imread(path+"/"+filename, cv2.IMREAD_UNCHANGED)
-			print image.shape
 			alpha = cv2.split(image)[-1]
 			image[:,:,0] = alpha
 			image[:,:,1] = alpha
 			image[:,:,2] = alpha
 			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-			image = cv2.GaussianBlur(image, (9,9), 10.0)
+			#image = cv2.GaussianBlur(image, (5,5), 10.0)
 			#image = cv2.split(image)[-1]
 			#image = image.convertTo( cv2.CV_8U )
-			#image = cv2.Laplacian( image, cv2.CV_64F )
+			#laplace = cv2.Laplacian( image, cv2.CV_64F, cv2.CV_16S, 5 )
+			#image = cv2.convertScaleAbs( laplace )
 			cv2.imshow(filename, image)
+			cv2.moveWindow(filename, count * 140, 200 )
 			self.images[ key ] = image
+			count += 1
 
 	@timed("Determining series")
 	def determine_series(self, image):
@@ -44,9 +47,9 @@ class SymbolDB:
 			#for series in ('soi','unh'):
 			template = self.images[ series ]
 			#res = cv2.bitwise_xor( image , template )
-			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF)
+			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF_NORMED)
 			cv2.imshow(series, res.copy())
-			matches += [( np.sum( res ), series )]
+			matches += [( np.max( res ), series )]
 		return sorted( matches, key=itemgetter(0), reverse=True )
 
 symbol_db = SymbolDB()
@@ -88,10 +91,10 @@ class CardImage:
 		symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
 		#gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
 		#symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
-		#symbol_image = 255 - symbol_image
 		#symbol_image = cv2.resize(symbol_image, (138, 138), interpolation = cv2.INTER_CUBIC)
-		symbol_image = cv2.equalizeHist(symbol_image)
-		symbol_image = cv2.adaptiveThreshold(symbol_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+		blur = cv2.GaussianBlur(symbol_image,(3,3),1)
+		_, symbol_image = cv2.threshold(blur, 128, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+		symbol_image = 255 - symbol_image
 		
 		#symbol_image = cv2.threshold(symbol_image, 240, 255, cv2.THRESH_BINARY)
 
