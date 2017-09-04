@@ -1,4 +1,8 @@
+import os
 import json
+from operator import itemgetter
+import cv2
+import numpy as np
 from decorators import *
 
 class CardDb:
@@ -49,3 +53,37 @@ class CardDb:
 			print "type =", match[1]['type']
 			print
 
+
+class SymbolDB:
+	@timed("Load image")
+	def __init__(self):
+		path = 'data/symbols/png'
+		self.files = ('rtr.png','bng.png','fut.png','bcore.png','all.png','soi.png','unh.png')
+		self.files = [ f for f in os.listdir(path) if ".png" in f ]
+		self.images = {}
+
+		for filename in self.files:
+			key = filename.replace(".png", "")
+			image = cv2.imread(path+"/"+filename, cv2.IMREAD_UNCHANGED)
+			alpha = cv2.split(image)[-1]
+			image[:,:,0] = alpha
+			image[:,:,1] = alpha
+			image[:,:,2] = alpha
+			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+			#image = cv2.GaussianBlur(image, (5,5), 10.0)
+			#image = cv2.split(image)[-1]
+			#image = image.convertTo( cv2.CV_8U )
+			#laplace = cv2.Laplacian( image, cv2.CV_64F, cv2.CV_16S, 5 )
+			#image = cv2.convertScaleAbs( laplace )
+			self.images[ key ] = image
+
+	@timed("Determining series")
+	def determine_series(self, image):
+		matches = []
+		for series, template in self.images.items():
+			#for series in ('soi','unh'):
+			template = self.images[ series ]
+			#res = cv2.bitwise_xor( image , template )
+			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF_NORMED)
+			matches += [( np.max( res ), series, res )]
+		return sorted( matches, key=itemgetter(0), reverse=True )

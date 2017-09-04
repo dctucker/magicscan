@@ -4,57 +4,14 @@ import pytesseract
 import argparse
 import cv2
 import os
-from db import CardDb
+from db import *
 from difflib import SequenceMatcher
-from operator import itemgetter
 import sys
 from decorators import *
 import numpy as np
 
 
 # TODO find logging library so we can set it to error,warn,info,debug levels
-
-class SymbolDB:
-	@timed("Load image")
-	def __init__(self):
-		path = 'data/symbols/png'
-		self.files = ('bng.png','fut.png','bcore.png','all.png','soi.png','unh.png')
-		self.files = [ f for f in os.listdir(path) if ".png" in f ]
-		self.images = {}
-		count = 0
-		for filename in self.files:
-			key = filename.replace(".png", "")
-			image = cv2.imread(path+"/"+filename, cv2.IMREAD_UNCHANGED)
-			alpha = cv2.split(image)[-1]
-			image[:,:,0] = alpha
-			image[:,:,1] = alpha
-			image[:,:,2] = alpha
-			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-			#image = cv2.GaussianBlur(image, (5,5), 10.0)
-			#image = cv2.split(image)[-1]
-			#image = image.convertTo( cv2.CV_8U )
-			#laplace = cv2.Laplacian( image, cv2.CV_64F, cv2.CV_16S, 5 )
-			#image = cv2.convertScaleAbs( laplace )
-			self.images[ key ] = image
-			count += 1
-			if count < 10:
-				cv2.imshow(filename, image)
-				cv2.moveWindow(filename, count * 140, 200 )
-
-	@timed("Determining series")
-	def determine_series(self, image):
-		matches = []
-		count = 0
-		for series, template in self.images.items():
-			#for series in ('soi','unh'):
-			template = self.images[ series ]
-			#res = cv2.bitwise_xor( image , template )
-			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF_NORMED)
-			matches += [( np.max( res ), series )]
-			count += 1
-			if count < 10:
-				cv2.imshow(series, res.copy())
-		return sorted( matches, key=itemgetter(0), reverse=True )
 
 symbol_db = SymbolDB()
 
@@ -89,10 +46,10 @@ class CardImage:
 		print "type...",
 		type_image = self.crop_segment( 0.05, 0.55, 0.85, 0.63 )
 
-		self.gray = cv2.resize(self.gray, None, fx = 1.8, fy = 1.8, interpolation = cv2.INTER_CUBIC)
+		self.gray = cv2.resize(self.gray, None, fx = 1.4, fy = 1.4, interpolation = cv2.INTER_CUBIC)
 		print "symbol...",
 		#symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
-		symbol_image = self.crop_segment( 0.88, 0.572, 0.955, 0.615 )
+		symbol_image = self.crop_segment( 0.87, 0.572, 0.955, 0.615 )
 		#gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
 		#symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
 		#symbol_image = cv2.resize(symbol_image, (138, 138), interpolation = cv2.INTER_CUBIC)
@@ -122,9 +79,24 @@ class CardImage:
 			cv2.moveWindow("Series",       sw/3, int(sh*0.7) )
 			cv2.moveWindow("Type",         sw/3, int(sh*0.2) )
 			cv2.moveWindow("Symbol",    sw-sw/4, int(sh*0.2) )
-			print "Press any key to continue...",
-			print symbol_db.determine_series( symbol_image )
+
+			matches = symbol_db.determine_series( symbol_image )
+			count = 0
+			for ratio,series,res in matches:
+				print (ratio,series,),
+
+				count += 1
+				if count < 10:
+					filename = series + ".png"
+					cv2.imshow(series, res)
+					cv2.imshow(filename, symbol_db.images[series])
+					cv2.moveWindow(series, count * 140, 20 )
+					cv2.moveWindow(filename, count * 140, 200 )
+
+
+			print
 			cv2.waitKey(0)
+			print "Press any key to continue...",
 			print "good job!"
 
 
