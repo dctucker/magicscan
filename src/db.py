@@ -48,3 +48,4 @@ class CardDb:
 			print "text =", match[1]['text']
 			print "type =", match[1]['type']
 			print
+

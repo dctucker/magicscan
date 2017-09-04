@@ -182,7 +182,6 @@ class CardImage:
 		return text
 
 
-
 if __name__ == '__main__':
 	try:
 		u'\u2014'.encode(sys.stdout.encoding)
