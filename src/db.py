@@ -62,6 +62,7 @@ class SymbolDB:
 		self.files = ('rtr.png','bng.png','fut.png','bcore.png','all.png','soi.png','unh.png')
 		self.files = [ f for f in os.listdir(path) if ".png" in f ]
 		self.images = {}
+		self.contours = {}
 
 		for filename in self.files:
 			key = filename.replace(".png", "")
@@ -79,18 +80,27 @@ class SymbolDB:
 			#image = cv2.convertScaleAbs( laplace )
 			self.images[ key ] = image
 
-	@timed("Determining series")
-	def determine_series(self, image):
-		# TODO implement multiscale template matching
+			_, contours, hierarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+			self.contours[key] = contours[0]
 
+	@timed("Matching templates")
+	def match_templates(self, image):
 		matches = []
 		for series, template in self.images.items():
-			#for series in ('soi','unh'):
 			template = self.images[ series ]
-			#res = cv2.bitwise_xor( image , template )
 			res = cv2.matchTemplate(image, template,  cv2.TM_CCOEFF_NORMED)
 			matches += [( np.max( res ), series, res )]
 		return sorted( matches, key=itemgetter(0), reverse=True )
+
+	@timed("Matching contours")
+	def match_contours(self, contours):
+		#TODO multiple contour mapping
+		matches = []
+		for series, template in self.images.items():
+			template = self.images[ series ]
+			res = cv2.matchShapes( contours, self.contours[series], 1, 0.0 )
+			matches += [( np.max( res ), series, res )]
+		return sorted( matches, key=itemgetter(0))
 
 	def show_determination(self, matches):
 		count = 0

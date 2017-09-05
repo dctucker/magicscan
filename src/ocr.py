@@ -8,6 +8,7 @@ from db import *
 import sys
 from decorators import *
 import numpy as np
+import random
 
 
 # TODO find logging library so we can set it to error,warn,info,debug levels
@@ -55,22 +56,33 @@ class CardImage:
 
 		matches_full = []
 		scales = ( 0.333, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.333, 1.5, 1.75, 1.8, 1.9)
+		scales = (1.75,)
 		for scale in scales:
 			print "symbol...",
 			#symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
-			symbol_image = self.crop_segment( 0.87, 0.573, 0.955, 0.62 )
+			symbol_image = self.crop_segment( 0.87, 0.573, 0.955, 0.616 )
 			symbol_image = cv2.resize(symbol_image, None, fx = scale, fy = scale)
 			#gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
 			#symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
 			#blur = cv2.GaussianBlur(symbol_image,(3,3),11)
 			#_, symbol_image = cv2.threshold(blur, 128, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-			#symbol_image = cv2.adaptiveThreshold(symbol_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+			symbol_image = cv2.adaptiveThreshold(symbol_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 			symbol_image = 255 - symbol_image
 			symbol_image = cv2.copyMakeBorder(symbol_image,60,60,60,60,cv2.BORDER_CONSTANT,value=(0,0,0))
-			matches = symbol_db.determine_series( symbol_image )
+			#symbol_image = cv2.filter2D( symbol_image, -1, cv2.getGaborKernel(
+
+			_, contours, hierarchy = cv2.findContours(symbol_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+			symbol_image = cv2.cvtColor(symbol_image, cv2.COLOR_GRAY2BGR)
+
+			for contour in contours:
+				color = np.random.randint(0,255,(3)).tolist()
+				cv2.drawContours( symbol_image, [contour], 0, color, 2)
+
+			#matches = symbol_db.determine_series( symbol_image )
+			matches = symbol_db.match_contours( contours[2] )
 			matches_full += matches
 
-		matches_full = sorted( matches_full, key=itemgetter(0), reverse=True )
+		matches_full = sorted( matches_full, key=itemgetter(0) )
 		print [(ratio,series,) for ratio,series,_ in matches_full]
 
 
