@@ -71,6 +71,7 @@ class SymbolDB:
 			image[:,:,1] = alpha
 			image[:,:,2] = alpha
 			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+			#image = cv2.resize(image, None, fx = 0.5, fy = 0.5)
 			#image = cv2.GaussianBlur(image, (5,5), 10.0)
 			#image = cv2.split(image)[-1]
 			#image = image.convertTo( cv2.CV_8U )

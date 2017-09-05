@@ -21,7 +21,8 @@ class CardImage:
 		self.image = cv2.resize(self.image, None, fx = 4, fy = 4, interpolation = cv2.INTER_CUBIC)
 		self.temp_filename = "{}.png".format(os.getpid())
 
-		self.gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+		self.gray = self.image.copy()
+		self.gray = cv2.cvtColor(self.gray, cv2.COLOR_BGR2GRAY)
 		self.gray = cv2.fastNlMeansDenoising(self.gray, None, 10)
 		#self.gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 		#self.gray = self.image
@@ -52,19 +53,28 @@ class CardImage:
 		print "type...",
 		type_image = self.crop_segment( 0.05, 0.55, 0.85, 0.63 )
 
-		self.gray = cv2.resize(self.gray, None, fx = 1.4, fy = 1.4, interpolation = cv2.INTER_CUBIC)
-		print "symbol...",
-		#symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
-		symbol_image = self.crop_segment( 0.87, 0.572, 0.955, 0.615 )
-		#gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
-		#symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
-		#symbol_image = cv2.resize(symbol_image, (138, 138), interpolation = cv2.INTER_CUBIC)
-		blur = cv2.GaussianBlur(symbol_image,(3,3),11)
-		_, symbol_image = cv2.threshold(blur, 128, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-		#symbol_image = cv2.adaptiveThreshold(symbol_image, 240, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-		symbol_image = 255 - symbol_image
-		symbol_image = cv2.copyMakeBorder(symbol_image,60,60,60,60,cv2.BORDER_CONSTANT,value=(0,0,0))
-		#symbol_image = cv2.threshold(symbol_image, 240, 255, cv2.THRESH_BINARY)
+		matches_full = []
+		scales = ( 0.333, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.333, 1.5, 1.75, 1.8, 1.9)
+		for scale in scales:
+			print "symbol...",
+			#symbol_image = self.crop_segment( 0.85, 0.55, 0.99, 0.65 )
+			symbol_image = self.crop_segment( 0.87, 0.573, 0.955, 0.62 )
+			symbol_image = cv2.resize(symbol_image, None, fx = scale, fy = scale)
+			#gaussian_3 = cv2.GaussianBlur(symbol_image, (9,9), 10.0)
+			#symbol_image = cv2.addWeighted(symbol_image, 1.5, gaussian_3, -0.5, 0, symbol_image)
+			#blur = cv2.GaussianBlur(symbol_image,(3,3),11)
+			#_, symbol_image = cv2.threshold(blur, 128, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+			#symbol_image = cv2.adaptiveThreshold(symbol_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+			symbol_image = 255 - symbol_image
+			symbol_image = cv2.copyMakeBorder(symbol_image,60,60,60,60,cv2.BORDER_CONSTANT,value=(0,0,0))
+			matches = symbol_db.determine_series( symbol_image )
+			matches_full += matches
+
+		matches_full = sorted( matches_full, key=itemgetter(0), reverse=True )
+		print [(ratio,series,) for ratio,series,_ in matches_full]
+
+
+
 
 		print "series...",
 		series_image = self.crop_segment( 0, 0.93, 0.2, 1 )
@@ -91,9 +101,6 @@ class CardImage:
 		cv2.moveWindow("Series",       sw/3, int(sh*0.7) )
 		cv2.moveWindow("Type",         sw/3, int(sh*0.2) )
 		cv2.moveWindow("Symbol",    sw-sw/4, int(sh*0.2) )
-
-		matches = symbol_db.determine_series( self.crops.symbol )
-		symbol_db.show_determination( matches )
 
 		print
 		cv2.waitKey(0)
